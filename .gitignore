@@ -1,0 +1,18 @@
+node_modules/
+dist/
+
+# 构建产物（index.html 例外：它是可直接双击运行的成品）
+DXF查看器.html
+示例图纸.html
+
+# 开发过程截图
+before_fix_*.png
+after_fix_*.png
+dimension_before.png
+dimension_after.png
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log

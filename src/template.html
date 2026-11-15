@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rliu · DXF 网页查看器 · 全对象彩色还原 · 测量绘图编辑</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,__LOGO_B64__">
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <img class="logo-img" src="data:image/png;base64,__LOGO_B64__" alt="Rliu">
+    <div class="brand-text">
+      <strong>Rliu<span class="brand-sub">DXF 网页查看器</span></strong>
+      <small id="fileLabel">未加载文件</small>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <button class="btn primary" id="btnOpen">打开 DXF 文件</button>
+  <input type="file" id="fileInput" accept=".dxf" hidden>
+  <button class="btn" id="btnFit" title="快捷键 F">适应窗口</button>
+  <button class="btn" id="btnTheme">浅色背景</button>
+  <div class="sep"></div>
+  <button class="btn" id="btnUndo" title="Ctrl+Z">↶ 撤销</button>
+  <button class="btn" id="btnRedo" title="Ctrl+Y">↷ 重做</button>
+  <button class="btn" id="btnSaveDxf" title="Ctrl+S：保存编辑后的 ASCII DXF">保存 DXF</button>
+  <select id="exportVer" class="btn sel" title="导出 DXF 的版本；跨版本会重置视觉样式与材质为默认值">
+    <option value="">与原图同版本</option>
+  </select>
+  <button class="btn" id="btnPng" title="导出整图 PNG；按住 Shift 点击则导出当前视图">导出 PNG</button>
+  <div class="spacer"></div>
+  <button class="btn" id="btnHelp">使用说明</button>
+</header>
+
+<div class="main">
+  <aside class="sidebar" id="leftPanel">
+    <div class="panel-head">图层 <span class="tag" id="layerCount"></span></div>
+    <div class="panel-tools">
+      <input id="layerSearch" placeholder="筛选图层名" autocomplete="off">
+      <button class="btn small" id="btnAllOn">全显</button>
+      <button class="btn small" id="btnAllOff">全隐</button>
+    </div>
+    <div id="layerList" class="scroll"></div>
+
+    <div class="panel-head">绘制选项</div>
+    <div class="toggles" id="toggleList">
+      <label><input type="checkbox" id="tLineweight" checked> 线宽</label>
+      <label><input type="checkbox" id="tLinetype" checked> 线型</label>
+      <label><input type="checkbox" id="tText" checked> 文字</label>
+      <label><input type="checkbox" id="tFill" checked> 填充</label>
+      <label><input type="checkbox" id="tPoints" checked> 点对象</label>
+      <label><input type="checkbox" id="tGrid"> 坐标网格</label>
+      <label><input type="checkbox" id="tMono"> 单色模式</label>
+      <label><input type="checkbox" id="tHideOff"> 隐藏关闭层</label>
+    </div>
+
+    <div class="panel-head">绘图设置 <span class="tag">新建对象使用</span></div>
+    <div class="draw-settings">
+      <label><span>图层</span><select id="setLayer"></select><button class="mini" id="btnNewLayer" title="新建图层">+</button></label>
+      <label><span>颜色</span><select id="setColor"></select></label>
+      <label><span>自定义</span><input type="color" id="setColorRGB" value="#FF6600"></label>
+      <label><span>线宽</span><select id="setLw"></select></label>
+      <label><span>字高</span><input type="number" id="setTextH" value="2.5" min="0.1" step="0.5"></label>
+      <div class="ds-toggles">
+        <label><input type="checkbox" id="setOrtho"> 正交 F8</label>
+        <label><input type="checkbox" id="setSnap" checked> 对象捕捉 F3</label>
+        <label><input type="checkbox" id="setGridSnap"> 栅格捕捉</label>
+      </div>
+    </div>
+
+    <div class="panel-head">实体类型统计 <span class="tag" id="statTotal"></span></div>
+    <div id="statList" class="scroll small"></div>
+    <div id="skipNote" class="skip-note" style="display:none"></div>
+  </aside>
+
+  <nav class="toolrail" id="toolrail" aria-label="工具箱">
+    <div class="rail-cap">视图 / 选择</div>
+    <button data-tool="view" title="浏览：拖拽平移、滚轮缩放、单击看属性 (Esc)">浏览</button>
+    <button data-tool="select" title="选择：单击选中、拖拽框选、拖动移动、Shift 加选 (V)">选择</button>
+    <button data-tool="pan" title="平移画布 (H)">平移</button>
+    <button data-tool="quick" title="快速测量：悬停看长度/面积/半径，单击生成标注 (Q)">快测</button>
+
+    <div class="rail-cap">测量</div>
+    <button data-tool="dist" title="两点距离、增量与角度 (D)">距离</button>
+    <button data-tool="chain" title="连续距离，回车/右键结束 (N)">连续</button>
+    <button data-tool="angle" title="三点夹角 (K)">角度</button>
+    <button data-tool="area" title="多边形面积与周长；也可直接点闭合图形 (J)">面积</button>
+    <button data-tool="radius" title="点选圆/圆弧读半径、直径、周长 (R)">半径</button>
+    <button data-tool="coord" title="标注点坐标 (I)">坐标</button>
+
+    <div class="rail-cap">绘图</div>
+    <button data-tool="line" title="直线，可连续绘制 (L)">直线</button>
+    <button data-tool="pline" title="多段线，回车结束、C 闭合 (P)">多段线</button>
+    <button data-tool="rect" title="矩形，对角两点 (B)">矩形</button>
+    <button data-tool="circle" title="圆，圆心+半径；可输入半径 (C)">圆</button>
+    <button data-tool="arc" title="三点圆弧 (A)">圆弧</button>
+    <button data-tool="point" title="放置点对象 (O)">点</button>
+    <button data-tool="text" title="文字：命令条输入内容后回车，再单击放置 (T)">文字</button>
+
+    <div class="rail-cap">编辑（先选中对象）</div>
+    <button data-tool="move" title="移动 (M)">移动</button>
+    <button data-tool="copy" title="复制 (Y)">复制</button>
+    <button data-tool="rotate" title="旋转 (U)">旋转</button>
+    <button data-tool="scale" title="缩放 (S)">缩放</button>
+    <button data-tool="mirror" title="镜像，保留原对象 (X)">镜像</button>
+    <button data-tool="erase" class="danger" title="删除选中对象 (Delete)">删除</button>
+  </nav>
+
+  <section class="stage" id="stage">
+    <canvas id="cv"></canvas>
+    <div class="dropzone" id="dropzone">
+      <div class="big">把 DXF 文件拖到这里</div>
+      <div class="sub">
+        或点击上方「打开 DXF 文件」按钮选择文件<br>
+        纯本地解析，不上传任何数据 · 支持 ASCII DXF（R12 ~ 2018）<br>
+        颜色按 AutoCAD 原始 ACI / 真彩色 / 图层色还原<br>
+        也可以直接点左侧绘图工具，从空白图纸开始画
+      </div>
+      <button class="btn primary" id="btnDropOpen">选择 DXF 文件</button>
+    </div>
+    <div class="cmdbar" id="cmdbar" style="display:none">
+      <span class="cmd-name" id="cmdName"></span>
+      <span class="cmd-prompt" id="cmdPrompt"></span>
+      <input id="cmdInput" autocomplete="off" spellcheck="false" placeholder="输入数值后回车">
+      <button class="btn small" id="cmdCancel">结束</button>
+    </div>
+    <div class="stage-hint" id="stageHint">滚轮缩放 · 拖拽平移 · 单击查看对象属性 · F 适应窗口</div>
+    <div class="toast" id="toast"></div>
+  </section>
+
+  <aside class="sidebar right" id="rightPanel">
+    <div class="panel-head">文件信息</div>
+    <div class="info-grid" id="fileInfo"></div>
+    <div class="panel-head">测量结果 <span class="tag" id="measureCount">0 条</span></div>
+    <div class="measure-tools">
+      <button class="btn small" id="btnClearMeasure">清除标注</button>
+      <button class="btn small" id="btnCsv">导出 CSV</button>
+    </div>
+    <div id="measureList" class="measure-list scroll"></div>
+    <div class="panel-head">对象属性 <span class="tag"><span id="selCount"></span> <span id="propHint"></span></span></div>
+    <div class="prop-edit" id="propEdit" style="display:none">
+      <div class="pe-title">编辑选中的对象</div>
+      <label><span>图层</span><select id="editLayer"></select></label>
+      <label><span>颜色</span><select id="editColor"></select></label>
+      <label><span>自定义</span><input type="color" id="editColorRGB" value="#FF6600"></label>
+      <label><span>线宽</span><select id="editLw"></select></label>
+      <div class="pe-buttons">
+        <button class="btn small primary" id="btnApplyProps">应用属性</button>
+        <button class="btn small" id="btnEraseSel">删除</button>
+        <button class="btn small" id="btnSelectAll">全选</button>
+      </div>
+    </div>
+    <div id="propBox" class="scroll"><div class="prop-empty">单击图形中的任意对象，查看其 DXF 属性与原始组码。</div></div>
+  </aside>
+</div>
+
+<footer class="statusbar">
+  <span>坐标 <b id="stCoord">—</b></span>
+  <span>比例 <b id="stScale">—</b></span>
+  <span>工具 <b id="stTool">浏览</b></span>
+  <span>实体 <b id="stEntities">0</b></span>
+  <span>绘制图元 <b id="stItems">0</b></span>
+  <span>图层 <b id="stLayers">0</b></span>
+  <span id="stUnit"></span>
+  <span class="spacer"></span>
+  <span class="st-measure" id="stMeasure"></span>
+  <span id="stMsg"></span>
+</footer>
+
+<div class="modal" id="helpModal">
+  <div class="modal-card">
+    <button class="btn small close" id="btnHelpClose">关闭</button>
+    <h2>使用说明</h2>
+    <p>这是一个<strong>单文件、零依赖、纯本地</strong>的 DXF 查看器 / 测量 / 绘图 / 编辑工具。双击 HTML 即可在浏览器中打开，不需要服务器、不需要联网、不需要安装任何插件。DXF 文件只在你的浏览器里解析，不会上传。</p>
+    <h3>两种使用方式</h3>
+    <p>1. 直接把 <code>.dxf</code> 拖进窗口，或用顶部按钮选择文件。<br>
+       2. 用附带的 <code>dxf2html.js</code> 把某个 DXF <strong>内嵌</strong>成独立网页，双击即直接显示图纸，无需再选文件。<br>
+       3. 不打开任何文件，直接点左侧绘图工具，也能从空白图纸开始画。</p>
+    <h3>视图操作</h3>
+    <p>滚轮 = 以光标为中心缩放；<strong>浏览</strong>模式下左键拖拽 = 平移；<code>F</code> = 适应窗口；<code>G</code> = 网格；<code>Esc</code> = 结束当前工具并清除选择。<br>
+       在其它工具中，用<strong>鼠标中键拖拽</strong>或<strong>按住空格 + 左键拖拽</strong>平移，<strong>右键</strong>等于回车（结束连续命令）。</p>
+    <h3>测量</h3>
+    <p>左侧「测量」组：距离、连续距离、夹角、面积 / 周长、半径 / 直径 / 周长、点坐标、快速测量（悬停即显示对象长度 / 面积 / 半径）。测量标注直接画在图上，右侧列出全部记录，可单条删除、整体清除或导出 CSV。测量时自动启用<strong>对象捕捉</strong>：端点、中点、圆心、象限点、交点、垂足、最近点（<code>F3</code> 开关），另有栅格捕捉与正交（<code>F8</code>）。</p>
+    <h3>绘图</h3>
+    <p>直线（可连续）、多段线（回车结束 / <code>C</code> 闭合）、矩形、圆（可输入半径回车）、三点圆弧、点、文字（命令条输入内容后回车，再单击放置）。新对象的图层、颜色（ACI / 真彩色）、线宽、字高在左侧「绘图设置」里选。圆和直线也支持输入长度 / 半径后回车精确定位。</p>
+    <h3>编辑与保存</h3>
+    <p>先用「选择」工具点选或框选对象（<code>Shift</code> 加选，<code>Ctrl+A</code> 全选），再执行移动、复制、旋转、缩放、镜像、删除；也可拖动已选中对象直接移动。右侧「对象属性」可批量改图层、颜色、线宽。所有编辑都作用于原始 DXF 组码，<code>Ctrl+Z</code> / <code>Ctrl+Y</code> 撤销重做，<code>Ctrl+S</code> 或「保存 DXF」把结果另存为新的 ASCII DXF（保留原文件 HEADER / TABLES / BLOCKS / OBJECTS 等段）。</p>
+    <p><strong>保存格式</strong>：「保存 DXF」右侧的下拉框可选 2018 / 2013 / 2010 / 2007 / 2000，默认与原图同版本。若原图是 2018 而你只有 AutoCAD 2013，选「AutoCAD 2013」即可。跨版本导出时，视觉样式、材质、注释比例等与版本强相关的对象会被重置为默认值（AutoCAD 会自动重建），图元、图层、块、文字不受影响。R12/R14 老图缺少句柄与子类标记，无法直接升级到新版本，会提示你先在 CAD 里另存为 2000 以上。</p>
+    <h3>常用快捷键</h3>
+    <p><code>V</code> 选择 · <code>H</code> 平移 · <code>Q</code> 快测 · <code>D</code> 距离 · <code>N</code> 连续 · <code>K</code> 角度 · <code>J</code> 面积 · <code>R</code> 半径 · <code>I</code> 坐标 · <code>L</code> 直线 · <code>P</code> 多段线 · <code>B</code> 矩形 · <code>C</code> 圆 · <code>A</code> 圆弧 · <code>O</code> 点 · <code>T</code> 文字 · <code>M</code> 移动 · <code>Y</code> 复制 · <code>U</code> 旋转 · <code>S</code> 缩放 · <code>X</code> 镜像 · <code>E</code> 删除。<br>
+       也可以在命令条里输入 CAD 风格命令：<code>PL</code>、<code>REC</code>、<code>DI</code>、<code>AA</code>、<code>CO</code>、<code>RO</code>、<code>SC</code>、<code>MI</code> 等。</p>
+    <h3>颜色还原规则</h3>
+    <p>按 DXF 优先级解析：<code>420 真彩色</code> &gt; <code>62 ACI 索引色</code> &gt; <code>随层 ByLayer</code>（含图层真彩色）&gt; <code>随块 ByBlock</code>（继承 INSERT 链）。ACI 采用 AutoCAD 2020 官方 256 色表。7 号色（白/黑）会随背景自动反色，深色画布下与 CAD 模型空间一致。负 ACI 色（图层关闭）仍按原色显示。</p>
+    <h3>支持的 DXF 对象</h3>
+    <p>LINE、LWPOLYLINE（含 bulge 圆弧）、POLYLINE / VERTEX、CIRCLE、ARC、ELLIPSE、SPLINE（NURBS）、POINT、SOLID、TRACE、3DFACE、TEXT、MTEXT、ATTRIB、ATTDEF、INSERT（嵌套块 / 阵列 / ByBlock 继承）、DIMENSION（匿名块）、HATCH（实体填充与图案线）、LEADER、MLINE、XLINE、RAY、IMAGE / WIPEOUT / VIEWPORT 边框。</p>
+    <h3>已知边界</h3>
+    <p>仅支持 <strong>ASCII DXF</strong>；二进制 DXF 请在 CAD 中另存为 ASCII。渲染为二维俯视投影，3DSOLID / REGION / BODY 等 ACIS 实体、光栅图片像素数据、代理对象无法还原，会在左侧「未渲染类型」中明确列出。文字 / 标注 / 填充的镜像与缩放在复杂实体上为近似结果；导出的 DXF 文本为 UTF-8 编码，旧版 CAD 若原本使用 GBK 代码页，中文可能需要重新指定代码页。</p>
+  </div>
+</div>
+
+<script>
+/*__JS__*/
+</script>
+</body>
+</html>
